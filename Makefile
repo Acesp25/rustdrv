@@ -1,6 +1,7 @@
 TESTSDIR=	${TESTSBASE}/rustdrv 
 
-ATF_TESTS_C= core_test
+ATF_TESTS_C= core_test \
+			 error_test
 
 .include <bsd.own.mk>
 .include <bsd.test.mk>
