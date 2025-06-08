@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #define DRIVER_PATH "/home/dev/freebsd-kernel-module-rust/hello.ko"
+#define MODULE_PATH "/dev/rustmodule"
 
 ATF_TC_WITHOUT_HEAD(driver_load_unload);
 ATF_TC_BODY(driver_load_unload, tc)
@@ -26,7 +27,7 @@ ATF_TC_BODY(driver_open_close, tc)
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
-    int fd = open("/dev/rustmodule", O_RDWR);
+    int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open /dev/rustmodule: %s", strerror(errno));
 
     close(fd);
@@ -41,7 +42,7 @@ ATF_TC_BODY(driver_read_write, tc)
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
-    int fd = open("/dev/rustmodule", O_RDWR);
+    int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open /dev/rustmodule: %s", strerror(errno));
 
     ssize_t wrt = write(fd, "Hello :D", 8);
