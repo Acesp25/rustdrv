@@ -1,26 +1,41 @@
 # rustdrv 
-rustdrv is a repo that is mirroring the src/tests/rustdrv changes from my freebsd fork. The goal of this is project is to create a testing framework for FreeBSD current and future driver devices. More to add about how to make it work
+rustdrv is a small set of example tests for an exisiting FreeBSD Rust driver. The goal of repo is to create a testing framework for FreeBSD current and future driver devices.
 
 ## Tested Driver
 The driver that is being tested is: https://github.com/Acesp25/freebsd-kernel-module-rust
-I need to add dynamic pathing to my tests so right now it wont work out of the box.
 
 ## Setup
 To setup and run the tests,
-1. Clone rustdrv under ```freebsd src/tests/rustdrv```
-2. Clone the previously mentioned driver and follow the repo's instructions to build it.
-3. Edit the #define paths in the .c test files to match your enviroment. You should only need to edit DRIVER_PATH and MODULE_PATH
-4. cd to the installed rustdrv folder
-5. Use the provided Makefile to build and install the tests:
+1. Clone rustdrv under ```src/tests/rustdrv```
+2. Clone the previously mentioned driver under $HOME and follow the repo's instructions to build it.
+3. cd to the installed rustdrv folder
+4. Use the provided Makefile to build and install the tests:
 ``` sh
 make
 sudo make install # installs the tests and creates a Kyuafile into /usr/tests/rustdrv
 ```
-4. Run the tests:
+5. Run the tests:
  ```sh
 sudo kyua test -k /usr/tests/rustdrv/Kyuafile
 ```
 
+## Tests
+### Core Tests: core_test.c
+1. Load/Unload test
+2. Open/Close test
+3. Read/Write test
+4. Jail test
+
+### Error Tests: error_test.c
+1. Null input test
+2. Unload while open Test
+3. Hot unload test
+4. Permission test
+
+### Performace Tests: perf_test.c
+1. Stress load test
+2. Concurrency test
+3. Leakage test
+
 ## Comments
-You need to have built the kld from the provided repo above and adjuted the paths in the .c files accordingly.
-WIP
+If the pathing doesnt seem to work, try editing the variables in the Makefile
