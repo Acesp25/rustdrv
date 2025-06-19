@@ -18,9 +18,18 @@
 #error DRIVER_NAME not defined
 #endif
 
+// Globals for cleanup
 static int fd = -1;
 static pid_t child = -1;
 
+/*
+ * Driver Null test
+ *
+ * Loads and opens the driver
+ * writes NULL with 10 bytes, checks for EFAULT
+ * reads NULL with 10 bytes, checks for EFAULT
+ * closes and unloads driver
+ */
 ATF_TC_WITH_CLEANUP(driver_null_input);
 ATF_TC_HEAD(driver_null_input, tc) {}
 ATF_TC_BODY(driver_null_input, tc)
@@ -31,11 +40,11 @@ ATF_TC_BODY(driver_null_input, tc)
     fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open MODULE_PATH: %s", strerror(errno));
 
-    ssize_t wrt = write(fd, NULL, 10);
-    ATF_REQUIRE_ERRNO(EFAULT, (wrt < 0));
+    ssize_t wrt = write(fd, NULL, 0);
+    ATF_REQUIRE_ERRNO(EFAULT, (wrt < 10));
 
-    ssize_t rd = read(fd, NULL, 10);
-    ATF_REQUIRE_ERRNO(EFAULT, (rd < 0));
+    ssize_t rd = read(fd, NULL, 0);
+    ATF_REQUIRE_ERRNO(EFAULT, (rd < 10));
 
     close(fd);
 
@@ -51,6 +60,14 @@ ATF_TC_CLEANUP(driver_null_input, tc)
     if (loaded >= 0) (void)kldunload(loaded);
 }
 
+/*
+ * Driver Open Unload test
+ *
+ * Loads and opens the driver
+ * Attempts to unload while still open
+ * Checks for failed unload
+ * Closes and unloads driver
+ */
 ATF_TC_WITH_CLEANUP(driver_open_unload);
 ATF_TC_HEAD(driver_open_unload, tc) {}
 ATF_TC_BODY(driver_open_unload, tc)
@@ -77,6 +94,14 @@ ATF_TC_CLEANUP(driver_open_unload, tc)
     if (loaded >= 0) (void)kldunload(loaded);
 }
 
+/*
+ * Driver Hot Unload test
+ *
+ * Loads driver, forks, handshake to sync fork
+ * Child repeadily writes while parent attempts to unload driver
+ * Checks to see if unload fails while writing
+ * Closes and unloads after checks
+ */
 ATF_TC_WITH_CLEANUP(driver_hot_unload);
 ATF_TC_HEAD(driver_hot_unload, tc) {}
 ATF_TC_BODY(driver_hot_unload, tc)
@@ -98,6 +123,7 @@ ATF_TC_BODY(driver_hot_unload, tc)
 
         char mark = '!';
         char c;
+        // handshake to sync threads
         if (write(sync[1], &mark, 1) != 1) {
             _exit(2);
         }
@@ -116,6 +142,7 @@ ATF_TC_BODY(driver_hot_unload, tc)
 
     close(sync[1]);
     char mark;
+    // verify handshake
     ATF_REQUIRE_MSG(read(sync[0], &mark, 1) == 1, "sync read failed: %s", strerror(errno));
     close(sync[0]);
 
@@ -143,6 +170,13 @@ ATF_TC_CLEANUP(driver_hot_unload, tc)
     if (loaded >= 0) (void)kldunload(loaded);
 }
 
+/*
+ * Driver Permission test
+ *
+ * Loads the driver, Updates modulepath permission
+ * Changes UID to nobody, attempts opening modulepath, checks for failure
+ * Switch UID back to root, unload driver
+ */
 ATF_TC_WITH_CLEANUP(driver_permission);
 ATF_TC_HEAD(driver_permission, tc) {}
 ATF_TC_BODY(driver_permission, tc)
@@ -157,6 +191,7 @@ ATF_TC_BODY(driver_permission, tc)
 
     ATF_REQUIRE_ERRNO(EACCES, open(MODULE_PATH, O_RDWR) == -1);
 
+    // back to root
     ATF_REQUIRE_MSG(seteuid(0) == 0, "seteuid() root failed: %s", strerror(errno));
 
     int unloaded = kldunload(kld_id);
