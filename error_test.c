@@ -28,6 +28,7 @@ static pid_t child = -1;
  * Loads and opens the driver
  * writes NULL with 10 bytes, checks for EFAULT
  * reads NULL with 10 bytes, checks for EFAULT
+ * writes NULL with 10 bytes, checks for EFAULT
  * closes and unloads driver
  */
 ATF_TC_WITH_CLEANUP(driver_null_input);
@@ -40,11 +41,11 @@ ATF_TC_BODY(driver_null_input, tc)
     fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open MODULE_PATH: %s", strerror(errno));
 
-    ssize_t wrt = write(fd, NULL, 0);
-    ATF_REQUIRE_ERRNO(EFAULT, (wrt < 10));
-
     ssize_t rd = read(fd, NULL, 0);
-    ATF_REQUIRE_ERRNO(EFAULT, (rd < 10));
+    ATF_REQUIRE_ERRNO(EFAULT, (rd < 0));
+
+    ssize_t wrt = write(fd, NULL, 0);
+    ATF_REQUIRE_ERRNO(EFAULT, (wrt < 0));
 
     close(fd);
 
