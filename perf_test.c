@@ -1,4 +1,4 @@
-#include <sys/linker.hd>
+#include <sys/linker.h>
 #include <sys/vmmeter.h>
 #include <sys/sysctl.h>
 #include <sys/wait.h>
@@ -25,15 +25,6 @@
 static int fd = -1;
 static pid_t child = -1;
 
-/*
- * Driver Stress Load test
- *
- * Obtains system VM stats
- * Write & Read 1000x 
- * Obtains system VM stat after operations
- * Verifys that t_free has not dropped more than 10 pages
- * Verifys that t_vm has not increased more than 10 pages
- */
 ATF_TC_WITHOUT_HEAD(driver_stress_load);
 ATF_TC_BODY(driver_stress_load, tc)
 {
@@ -46,16 +37,8 @@ ATF_TC_BODY(driver_stress_load, tc)
     }
 }
 
-/*
- * Driver Concurrency test
- *
- * Loads driver, forks
- * Syncs fork and has both parent and child write and read 1000x
- * Checks for failure during each operation 
- */
 ATF_TC_WITH_CLEANUP(driver_concurrency);
- *
-apture system VM stats (free & total pages).
+ATF_TC_HEAD(driver_concurrency, tc) {}
 ATF_TC_BODY(driver_concurrency, tc) {
     int status;
 
@@ -73,7 +56,6 @@ ATF_TC_BODY(driver_concurrency, tc) {
         int child_fd = open(MODULE_PATH, O_RDWR);
         if (child_fd < 0) _exit(1);
 
-        // handshake
         write(sync[1], "1", 1);
 
         ssize_t child_wrt, child_rd;
@@ -93,7 +75,6 @@ ATF_TC_BODY(driver_concurrency, tc) {
 
     char syncb;
     close(sync[1]);
-    // handshake
     ATF_REQUIRE(read(sync[0], &syncb, 1) == 1);
 
     fd = open(MODULE_PATH, O_RDWR);
@@ -120,7 +101,8 @@ ATF_TC_BODY(driver_concurrency, tc) {
     kld_id = -1;
     child  = -1;
 }
-ATF_TC_CLEANUP(driver_concurrency, tapture system VM stats (free & total pages).
+ATF_TC_CLEANUP(driver_concurrency, tc) {
+    if (child > 0) {
         kill(child, SIGTERM);
         waitpid(child, NULL, 0);
     }
@@ -130,14 +112,7 @@ ATF_TC_CLEANUP(driver_concurrency, tapture system VM stats (free & total pages).
         (void)kldunload(loaded);
     }
 }
-ad the kernel module, open its device node, and perform
 
-/*
- * Read VM_total
- * 
- * Method to assist with leakage test.
- * Uses sysctl call to obtain page count
- */
 static void read_vmtotal(struct vmtotal *vt)
 {
     int mib[2] = {CTL_VM, VM_TOTAL};
@@ -145,18 +120,6 @@ static void read_vmtotal(struct vmtotal *vt)
     ATF_REQUIRE_MSG(sysctl(mib, 2, vt, &len, NULL, 0) == 0, "sysctl failed: %s", strerror(errno));
     ATF_REQUIRE_MSG(len == sizeof(*vt), "sysctl returned unexpected size");
 }
-/*
- * Driver Leakage test
- *
- * Obtains system VM stats
- * Write & Read 1000x 
- * Obtains system VM stat after operations
- * Verifys that t_free has not dropped more than 10 pages
- * Verifys that t_vm has not increased more than 10 pages
- *
- * Note: due to page rounding this might fail, should we extend the page
- * window and write loop??
- */
 ATF_TC_WITH_CLEANUP(driver_leakage);
 ATF_TC_HEAD(driver_leakage, tc) {}
 ATF_TC_BODY(driver_leakage, tc)
@@ -208,4 +171,4 @@ ATF_TP_ADD_TCS(tp)
     ATF_TP_ADD_TC(tp, driver_leakage);
 
     return atf_no_error();
-ed cycles.
+}
