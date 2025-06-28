@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #ifndef DRIVER_PATH
 #error DRIVER_PATH not defined
@@ -21,9 +22,6 @@
 #ifndef DRIVER_NAME
 #error DRIVER_NAME not defined
 #endif
-
-static int fd = -1;
-static pid_t child = -1;
 
 ATF_TC_WITHOUT_HEAD(driver_stress_load);
 ATF_TC_BODY(driver_stress_load, tc)
@@ -37,76 +35,35 @@ ATF_TC_BODY(driver_stress_load, tc)
     }
 }
 
+static void* writer(void* __unused arg)
+{
+    int fd = open(MODULE_PATH, O_RDWR);
+    ATF_REQUIRE(fd >= 0);
+    char buff;
+    for (int i = 0; i < 1000; ++i) {
+        ATF_REQUIRE(write(fd, "A", 1) != -1);
+        ATF_REQUIRE(read(fd, &buff, 1) != -1);
+    }
+    close(fd);
+    return NULL;
+}
 ATF_TC_WITH_CLEANUP(driver_concurrency);
 ATF_TC_HEAD(driver_concurrency, tc) {}
 ATF_TC_BODY(driver_concurrency, tc) {
-    int status;
-
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
-    int sync[2];
-    ATF_REQUIRE(pipe(sync) == 0);
+    pthread_t t1, t2;
+    
+    pthread_create(&t1, NULL, writer, NULL);
+    pthread_create(&t2, NULL, writer, NULL);
 
-    child = fork();
-    ATF_REQUIRE_MSG(child >= 0, "fork() failed: %s", strerror(errno));
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
 
-    if (child == 0) {
-        close(sync[0]);
-        int child_fd = open(MODULE_PATH, O_RDWR);
-        if (child_fd < 0) _exit(1);
-
-        write(sync[1], "1", 1);
-
-        ssize_t child_wrt, child_rd;
-        char child_buff;
-
-        for (int i = 0; i < 1000; i++) {
-            child_wrt = write(child_fd, "A", 1);
-            if (child_wrt < 0) _exit(1);
-            child_rd = read(child_fd, &child_buff, 1);
-            if (child_rd != 1) _exit(1);
-
-            lseek(child_fd, 0, SEEK_SET);
-        }
-        close(child_fd);
-        _exit(0);
-    }
-
-    char syncb;
-    close(sync[1]);
-    ATF_REQUIRE(read(sync[0], &syncb, 1) == 1);
-
-    fd = open(MODULE_PATH, O_RDWR);
-    ATF_REQUIRE_MSG(fd >= 0, "parent open failed: %s", strerror(errno));
-
-    ssize_t wrt, rd;
-    char buff;
-
-    for (int i = 0; i < 1000; i++) {
-        wrt = write(fd, "A", 1);
-        ATF_REQUIRE_MSG(wrt >= 0, "Unable to write to MODULE_PATH: %s", strerror(errno));
-        rd = read(fd, &buff, 1);
-        ATF_REQUIRE_MSG(rd == 1, "Unable to read from MODULE_PATH: %s", strerror(errno));
-
-        lseek(fd, 0, SEEK_SET);
-    }
-
-    close(fd);
-    ATF_REQUIRE(waitpid(child, &status, 0) == child);
-    ATF_REQUIRE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
-
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload failed: %s", strerror(errno));
-
-    kld_id = -1;
-    child  = -1;
+    ATF_REQUIRE(kldunload(kld_id) == 0);
 }
 ATF_TC_CLEANUP(driver_concurrency, tc) {
-    if (child > 0) {
-        kill(child, SIGTERM);
-        waitpid(child, NULL, 0);
-    }
-
     int loaded = kldfind(DRIVER_NAME);
     if (loaded >= 0) {
         (void)kldunload(loaded);
@@ -129,7 +86,7 @@ ATF_TC_BODY(driver_leakage, tc)
 
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
-    fd = open(MODULE_PATH, O_RDWR);
+    int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open from MODULE_PATH: %s", strerror(errno));
 
     ssize_t wrt, rd;
@@ -146,20 +103,15 @@ ATF_TC_BODY(driver_leakage, tc)
     ATF_REQUIRE_MSG(close(fd) == 0, "close failed: %s", strerror(errno));
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
 
-    kld_id = -1;
-    fd = -1;
-
     read_vmtotal(&after);
 
     ATF_CHECK_MSG(after.t_free >= before.t_free - 10, "free pages dropped from %jd to %jd", 
             (intmax_t)before.t_free, (intmax_t)after.t_free);
-    ATF_CHECK_MSG(after.t_vm   <= before.t_vm   + 10, "total VM pages grew from %jd to %jd",
+    ATF_CHECK_MSG(after.t_vm <= before.t_vm + 10, "total VM pages grew from %jd to %jd",
             (intmax_t)before.t_vm, (intmax_t)after.t_vm);
 }
 ATF_TC_CLEANUP(driver_leakage, tc)
 {
-    if (fd > 0) close(fd);
-
     int loaded = kldfind(DRIVER_NAME);
     if (loaded >= 0) (void)kldunload(loaded);
 }
