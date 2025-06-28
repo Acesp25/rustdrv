@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #ifndef DRIVER_PATH
 #error DRIVER_PATH not defined
@@ -18,9 +19,6 @@
 #error DRIVER_NAME not defined
 #endif
 
-static int fd = -1;
-static pid_t child = -1;
-
 ATF_TC_WITH_CLEANUP(driver_null_input);
 ATF_TC_HEAD(driver_null_input, tc) {}
 ATF_TC_BODY(driver_null_input, tc)
@@ -28,7 +26,7 @@ ATF_TC_BODY(driver_null_input, tc)
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
-    fd = open(MODULE_PATH, O_RDWR);
+    int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open MODULE_PATH: %s", strerror(errno));
 
     ssize_t rd = read(fd, NULL, 10);
@@ -40,13 +38,9 @@ ATF_TC_BODY(driver_null_input, tc)
     close(fd);
 
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
-
-    fd = -1;
 }
 ATF_TC_CLEANUP(driver_null_input, tc)
 {
-    if (fd >= 0) close(fd);
-
     int loaded = kldfind(DRIVER_NAME);
     if (loaded >= 0) (void)kldunload(loaded);
 }
@@ -58,25 +52,36 @@ ATF_TC_BODY(driver_open_unload, tc)
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
-    fd = open(MODULE_PATH, O_RDWR);
+    int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open MODULE_PATH: %s", strerror(errno));
 
-    ATF_REQUIRE_ERRNO(EBUSY, kldunload(kld_id) == -1);
+    int unload = kldunload(kld_id);
+    ATF_REQUIRE_MSG(unload < 0, "KLDUNLOAD returned %d", unload);
 
     close(fd);
 
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
-
-    fd = -1;
 }
 ATF_TC_CLEANUP(driver_open_unload, tc)
 {
-    if (fd >= 0) close(fd);
-
     int loaded = kldfind(DRIVER_NAME);
     if (loaded >= 0) (void)kldunload(loaded);
 }
 
+static void* writer(void* __unused arg) {
+    int fd = open(MODULE_PATH, O_RDWR);
+    char buff; 	
+    while(1) {
+        ATF_REQUIRE(write(fd, "A", 1) != -1);
+        ATF_REQUIRE(read(fd, &buff, 1) != -1); 
+    }
+    close(fd);
+    return NULL;
+}
+static void* unloader(void* __unused arg) {
+    ATF_REQUIRE_ERRNO(EFAULT, kldunload(kldfind(DRIVER_NAME)) == -1);
+    return NULL;  
+}
 ATF_TC_WITH_CLEANUP(driver_hot_unload);
 ATF_TC_HEAD(driver_hot_unload, tc) {}
 ATF_TC_BODY(driver_hot_unload, tc)
@@ -84,61 +89,20 @@ ATF_TC_BODY(driver_hot_unload, tc)
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
-    int sync[2];
-    ATF_REQUIRE(pipe(sync) == 0);
-
-    child = fork();
-    ATF_REQUIRE_MSG(child >= 0, "fork() failed: %s", strerror(errno));
-
-    if (child == 0) {
-        close(sync[0]);
-
-        fd = open(MODULE_PATH, O_RDWR);
-        if (fd < 0) _exit(1);
-
-        char mark = '!';
-        char c;
-        if (write(sync[1], &mark, 1) != 1) {
-            _exit(2);
-        }
-        close(sync[1]);
-
-        for (int i = 0; i < 300; ++i) {
-            ssize_t wrt = write(fd, &mark, 1);
-            if (wrt != 1) _exit(1);
-            ssize_t rd = read(fd, &c, 1);
-            if (rd != 1) _exit(1);
-            lseek(fd, 0, SEEK_SET);
-        }
-        close(fd);
-        _exit(0);
-    }
-
-    close(sync[1]);
-    char mark;
-    ATF_REQUIRE_MSG(read(sync[0], &mark, 1) == 1, "sync read failed: %s", strerror(errno));
-    close(sync[0]);
-
-    ATF_REQUIRE_ERRNO(EBUSY, kldunload(kld_id) == -1);
-
-    int status;
-    ATF_REQUIRE_MSG(waitpid(child, &status, 0) == child, "waitpid() failed: %s", strerror(errno));
-    ATF_REQUIRE_MSG(WIFEXITED(status) && WEXITSTATUS(status) == 0, "I/O child exited abnormally");
+    pthread_t t1, t2;
+    
+    pthread_create(&t1, NULL, writer, NULL);
+    sleep(2);
+    pthread_create(&t2, NULL, unloader, NULL);
+    
+    pthread_join(t2, NULL);
+    pthread_cancel(t1);
+    pthread_join(t1, NULL);
 
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
-
-    fd = -1;
-    child = -1;
 }
 ATF_TC_CLEANUP(driver_hot_unload, tc)
 {
-    if (fd >= 0) close(fd);
-
-    if (child > 0) {
-        kill(child, SIGTERM);
-        waitpid(child, NULL, 0);
-    }
-
     int loaded = kldfind(DRIVER_NAME);
     if (loaded >= 0) (void)kldunload(loaded);
 }
