@@ -18,9 +18,6 @@
 #error DRIVER_NAME not defined
 #endif
 
-static int fd = -1;
-static pid_t child = -1;
-
 ATF_TC_WITHOUT_HEAD(driver_load_unload);
 ATF_TC_BODY(driver_load_unload, tc)
 {
@@ -38,13 +35,11 @@ ATF_TC_BODY(driver_open_close, tc)
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
-    fd = open(MODULE_PATH, O_RDWR);
+    int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open /dev/rustmodule: %s", strerror(errno));
 
     close(fd);
-
-    int unloaded = kldunload(kld_id);
-    ATF_REQUIRE_MSG(unloaded == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
 }
 
 ATF_TC_WITHOUT_HEAD(driver_read_write);
@@ -53,17 +48,14 @@ ATF_TC_BODY(driver_read_write, tc)
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
-    fd = open(MODULE_PATH, O_RDWR);
+    int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open /dev/rustmodule: %s", strerror(errno));
 
-    ssize_t wrt = write(fd, "Hello :D", 8);
-    ATF_REQUIRE_MSG(wrt >= 0, "Unable to write to /dev/rustmodule: %s", strerror(errno));
+    ATF_REQUIRE(write(fd, "Hello :D", 8) != -1);
     char buff[8] = {0};
-    ssize_t rd = read(fd, buff, 8);
-    ATF_REQUIRE_MSG(rd == 8, "Unable to read from /dev/rustmodule: %s", strerror(errno));
+    ATF_REQUIRE_EQ(8, read(fd, &buff, 8));
 
     close(fd);
-
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
 }
 
@@ -81,8 +73,9 @@ ATF_TC_BODY(driver_jail, tc)
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
-    child = fork();
+    pid_t child = fork();
     ATF_REQUIRE_MSG(child >= 0, "fork failed: %s", strerror(errno));
+
     if (child == 0) { 
         memset(&j, 0, sizeof(j));
         j.version = JAIL_API_VERSION;
@@ -93,14 +86,12 @@ ATF_TC_BODY(driver_jail, tc)
         jail_id = jail(&j);
         ATF_REQUIRE_MSG(jail_id >= 0, "jail() failed: %s", strerror(errno));
 
-        fd = open(MODULE_PATH, O_RDWR);
+        int fd = open(MODULE_PATH, O_RDWR);
         if (fd < 0) _exit(1);
 
-        ssize_t wrt = write(fd, "Hello :D", 8);
-        if (wrt < 0) _exit(1);
+        if (write(fd, "Hello :D", 8) < 0) _exit(1);
         char buff[8] = {0};
-        ssize_t rd = read(fd, buff, 8);
-        if (rd != 8) _exit(1);
+        if (read(fd, &buff, 8) != 8) _exit(1);
 
         close(fd);
         _exit(0);
@@ -112,19 +103,9 @@ ATF_TC_BODY(driver_jail, tc)
             "child failed with status %d", WEXITSTATUS(status));
 
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
-
-    child = -1;
-    fd = -1;
 }
 ATF_TC_CLEANUP(driver_jail, tc)
 {
-    if (fd >= 0) close(fd);
-
-    if (child > 0) {
-        kill(child, SIGTERM);
-        waitpid(child, NULL, 0);
-    }
-
     int loaded = kldfind(DRIVER_NAME);
     if (loaded >= 0) (void)kldunload(loaded);
 }

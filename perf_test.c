@@ -89,18 +89,15 @@ ATF_TC_BODY(driver_leakage, tc)
     int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open from MODULE_PATH: %s", strerror(errno));
 
-    ssize_t wrt, rd;
     char buff[21] = {0};
     for (int i = 0; i < 1000; i++) {
-        wrt = write(fd, "Better not leak this!", 21);
-        ATF_REQUIRE_MSG(wrt >= 0, "Unable to write to MODULE_PATH: %s", strerror(errno));
-        rd = read(fd, buff, 21);
-        ATF_REQUIRE_MSG(rd == 21, "Unable to read from MODULE_PATH: %s", strerror(errno));
+        ATF_REQUIRE(write(fd, "Better not leak this!", 21) != -1);
+        ATF_REQUIRE_EQ(21, read(fd, &buff, 21));
 
         lseek(fd, 0, SEEK_SET);
     }
 
-    ATF_REQUIRE_MSG(close(fd) == 0, "close failed: %s", strerror(errno));
+    close(fd);
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
 
     read_vmtotal(&after);
