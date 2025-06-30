@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #ifndef DRIVER_PATH
 #error DRIVER_PATH not defined
@@ -68,10 +69,18 @@ ATF_TC_CLEANUP(driver_open_unload, tc)
     if (loaded >= 0) (void)kldunload(loaded);
 }
 
+static sem_t mutex;
 static void* writer(void* __unused arg) {
     int fd = open(MODULE_PATH, O_RDWR);
+    ATF_REQUIRE(fd >= 0);
     char buff; 	
-    while(1) {
+
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+
+    ATF_REQUIRE_EQ(0, sem_post(&mutex)); 
+
+    while (1) {
         ATF_REQUIRE(write(fd, "A", 1) != -1);
         ATF_REQUIRE(read(fd, &buff, 1) != -1); 
     }
@@ -79,7 +88,12 @@ static void* writer(void* __unused arg) {
     return NULL;
 }
 static void* unloader(void* __unused arg) {
+    ATF_REQUIRE_EQ(0, sem_wait(&mutex));
+
+    sleep(1); // time for the while loop to start
+
     ATF_REQUIRE_ERRNO(EFAULT, kldunload(kldfind(DRIVER_NAME)) == -1);
+
     return NULL;  
 }
 ATF_TC_WITH_CLEANUP(driver_hot_unload);
@@ -89,15 +103,19 @@ ATF_TC_BODY(driver_hot_unload, tc)
     int kld_id = kldload(DRIVER_PATH);
     ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
+    ATF_REQUIRE_EQ(0, sem_init(&mutex, 0, 0));
+
     pthread_t t1, t2;
     
-    pthread_create(&t1, NULL, writer, NULL);
-    sleep(2);
-    pthread_create(&t2, NULL, unloader, NULL);
+    ATF_REQUIRE_EQ(0, pthread_create(&t1, NULL, writer, NULL));
+    sleep(1);
+    ATF_REQUIRE_EQ(0, pthread_create(&t2, NULL, unloader, NULL));
     
-    pthread_join(t2, NULL);
-    pthread_cancel(t1);
-    pthread_join(t1, NULL);
+    ATF_REQUIRE_EQ(0, pthread_cancel(t1));
+    ATF_REQUIRE_EQ(0, pthread_join(t1, NULL));
+    ATF_REQUIRE_EQ(0, pthread_join(t2, NULL));
+
+    ATF_REQUIRE_EQ(0, sem_destroy(&mutex));
 
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
 }
