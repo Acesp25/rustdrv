@@ -18,7 +18,8 @@
 #error DRIVER_NAME not defined
 #endif
 
-ATF_TC_WITHOUT_HEAD(driver_load_unload);
+ATF_TC_WITH_CLEANUP(driver_load_unload);
+ATF_TC_HEAD(driver_load_unload, tc) {}
 ATF_TC_BODY(driver_load_unload, tc)
 {
     int kld_id = kldload(DRIVER_PATH);
@@ -27,6 +28,11 @@ ATF_TC_BODY(driver_load_unload, tc)
     ATF_REQUIRE_MSG(kldfind(DRIVER_NAME) >= 0, "kld not found after loading: %s", strerror(errno));
 
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+}
+ATF_TC_CLEANUP(driver_load_unload, tc)
+{
+    int loaded = kldfind(DRIVER_NAME);
+    if (loaded >= 0) kldunload(loaded);
 }
 
 ATF_TC_WITHOUT_HEAD(driver_open_close);
@@ -42,7 +48,8 @@ ATF_TC_BODY(driver_open_close, tc)
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
 }
 
-ATF_TC_WITHOUT_HEAD(driver_read_write);
+ATF_TC_WITH_CLEANUP(driver_read_write);
+ATF_TC_HEAD(driver_read_write, tc) {}
 ATF_TC_BODY(driver_read_write, tc)
 {
     int kld_id = kldload(DRIVER_PATH);
@@ -57,6 +64,11 @@ ATF_TC_BODY(driver_read_write, tc)
 
     close(fd);
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+}
+ATF_TC_CLEANUP(driver_read_write, tc) 
+{
+    int loaded = kldfind(DRIVER_NAME);
+    if (loaded >= 0) kldunload(loaded);
 }
 
 ATF_TC_WITH_CLEANUP(driver_jail);

@@ -65,9 +65,7 @@ ATF_TC_BODY(driver_concurrency, tc) {
 }
 ATF_TC_CLEANUP(driver_concurrency, tc) {
     int loaded = kldfind(DRIVER_NAME);
-    if (loaded >= 0) {
-        (void)kldunload(loaded);
-    }
+    if (loaded >= 0) (void)kldunload(loaded);
 }
 
 static void read_vmtotal(struct vmtotal *vt)
