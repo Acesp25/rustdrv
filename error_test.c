@@ -56,7 +56,7 @@ ATF_TC_BODY(driver_open_unload, tc)
     int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE_MSG(fd >= 0, "Unable to open MODULE_PATH: %s", strerror(errno));
 
-    ATF_REQUIRE_ERRNO(EFAULT, kldunload(kld_id) == -1);
+    ATF_REQUIRE_ERRNO(EBUSY, kldunload(kld_id) == -1);
 
     close(fd);
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
@@ -90,7 +90,7 @@ static void* unloader(void* __unused arg) {
 
     sleep(1); // time for the while loop to start
 
-    ATF_REQUIRE_ERRNO(EFAULT, kldunload(kldfind(DRIVER_NAME)) == -1);
+    ATF_REQUIRE_ERRNO(EBUSY, kldunload(kldfind(DRIVER_NAME)) == -1);
 
     return NULL;  
 }
