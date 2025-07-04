@@ -143,8 +143,8 @@ ATF_TC_BODY(driver_permission, tc)
 }
 ATF_TC_CLEANUP(driver_permission, tc)
 {
-    (void)seteuid(0);
-    (void)chmod(MODULE_PATH, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    seteuid(0);
+    chmod(MODULE_PATH, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 
     int loaded = kldfind(DRIVER_NAME);
     if (loaded >= 0) kldunloadf(loaded, LINKER_UNLOAD_FORCE);

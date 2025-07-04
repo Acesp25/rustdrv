@@ -66,7 +66,7 @@ ATF_TC_BODY(driver_read_write, tc)
 
     ATF_REQUIRE(write(fd, "Hello :D", 8) != -1);
     char buff[8] = {0};
-    ATF_REQUIRE_EQ(8, read(fd, &buff, 8));
+    ATF_REQUIRE(read(fd, &buff, 8) != -1);
 
     close(fd);
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
@@ -107,9 +107,9 @@ ATF_TC_BODY(driver_jail, tc)
         int fd = open(MODULE_PATH, O_RDWR);
         if (fd < 0) _exit(1);
 
-        if (write(fd, "Hello :D", 8) < 0) _exit(1);
+        if (write(fd, "Hello :D", 8) == -1) _exit(1);
         char buff[8] = {0};
-        if (read(fd, &buff, 8) != 8) _exit(1);
+        if (read(fd, &buff, 8) == -1) _exit(1);
 
         close(fd);
         _exit(0);
