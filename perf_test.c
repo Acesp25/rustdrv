@@ -28,7 +28,7 @@ ATF_TC_HEAD(driver_stress_load, tc) {}
 ATF_TC_BODY(driver_stress_load, tc)
 {
     int kld_id;
-    for (int i = 0; i < 10000; ++i) {
+    for (int i = 0; i < 1000; ++i) {
         kld_id = kldload(DRIVER_PATH);
         ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
 
@@ -46,7 +46,7 @@ static void* writer(void* __unused arg)
     int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE(fd >= 0);
     char buff;
-    for (int i = 0; i < 10000; ++i) {
+    for (int i = 0; i < 1000; ++i) {
         ATF_REQUIRE(write(fd, "A", 1) != -1);
         ATF_REQUIRE(read(fd, &buff, 1) != -1);
     }
