@@ -43,7 +43,7 @@ ATF_TC_BODY(driver_null_input, tc)
 ATF_TC_CLEANUP(driver_null_input, tc)
 {
     int loaded = kldfind(DRIVER_NAME);
-    if (loaded >= 0) (void)kldunload(loaded);
+    if (loaded >= 0) kldunloadf(loaded, LINKER_UNLOAD_FORCE);
 }
 
 ATF_TC_WITH_CLEANUP(driver_open_unload);
@@ -64,7 +64,7 @@ ATF_TC_BODY(driver_open_unload, tc)
 ATF_TC_CLEANUP(driver_open_unload, tc)
 {
     int loaded = kldfind(DRIVER_NAME);
-    if (loaded >= 0) (void)kldunload(loaded);
+    if (loaded >= 0) kldunloadf(loaded, LINKER_UNLOAD_FORCE);
 }
 
 static sem_t mutex;
@@ -120,7 +120,7 @@ ATF_TC_BODY(driver_hot_unload, tc)
 ATF_TC_CLEANUP(driver_hot_unload, tc)
 {
     int loaded = kldfind(DRIVER_NAME);
-    if (loaded >= 0) (void)kldunload(loaded);
+    if (loaded >= 0) kldunloadf(loaded, LINKER_UNLOAD_FORCE);
 }
 
 ATF_TC_WITH_CLEANUP(driver_permission);
@@ -147,7 +147,7 @@ ATF_TC_CLEANUP(driver_permission, tc)
     (void)chmod(MODULE_PATH, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 
     int loaded = kldfind(DRIVER_NAME);
-    if (loaded >= 0) (void)kldunload(loaded);
+    if (loaded >= 0) kldunloadf(loaded, LINKER_UNLOAD_FORCE);
 }
 
 ATF_TP_ADD_TCS(tp)

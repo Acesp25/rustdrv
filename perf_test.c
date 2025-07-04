@@ -23,7 +23,8 @@
 #error DRIVER_NAME not defined
 #endif
 
-ATF_TC_WITHOUT_HEAD(driver_stress_load);
+ATF_TC_WITH_CLEANUP(driver_stress_load);
+ATF_TC_HEAD(driver_stress_load, tc) {}
 ATF_TC_BODY(driver_stress_load, tc)
 {
     int kld_id;
@@ -33,6 +34,11 @@ ATF_TC_BODY(driver_stress_load, tc)
 
         ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
     }
+}
+ATF_TC_CLEANUP(driver_stress_load, tc)
+{
+    int loaded = kldfind(DRIVER_NAME);
+    if (loaded >= 0) kldunloadf(loaded, LINKER_UNLOAD_FORCE);
 }
 
 static void* writer(void* __unused arg)
@@ -65,7 +71,7 @@ ATF_TC_BODY(driver_concurrency, tc) {
 }
 ATF_TC_CLEANUP(driver_concurrency, tc) {
     int loaded = kldfind(DRIVER_NAME);
-    if (loaded >= 0) (void)kldunload(loaded);
+    if (loaded >= 0) kldunloadf(loaded, LINKER_UNLOAD_FORCE);
 }
 
 static void read_vmtotal(struct vmtotal *vt)
@@ -108,7 +114,7 @@ ATF_TC_BODY(driver_leakage, tc)
 ATF_TC_CLEANUP(driver_leakage, tc)
 {
     int loaded = kldfind(DRIVER_NAME);
-    if (loaded >= 0) (void)kldunload(loaded);
+    if (loaded >= 0) kldunloadf(loaded, LINKER_UNLOAD_FORCE);
 }
 
 ATF_TP_ADD_TCS(tp)
