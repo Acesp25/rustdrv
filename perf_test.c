@@ -49,6 +49,7 @@ static void* writer(void* __unused arg)
     for (int i = 0; i < 1000; ++i) {
         ATF_REQUIRE(write(fd, "A", 1) != -1);
         ATF_REQUIRE(read(fd, &buff, 1) != -1);
+        ATF_REQUIRE_EQ(0, lseek(fd, 0, SEEK_SET));
     }
     close(fd);
     return NULL;
@@ -67,7 +68,7 @@ ATF_TC_BODY(driver_concurrency, tc) {
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
 
-    ATF_REQUIRE(kldunload(kld_id) == 0);
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 }
 ATF_TC_CLEANUP(driver_concurrency, tc) {
     int loaded = kldfind(DRIVER_NAME);

@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <machine/atomic.h>
 
 #ifndef DRIVER_PATH
 #error DRIVER_PATH not defined
@@ -68,6 +69,7 @@ ATF_TC_CLEANUP(driver_open_unload, tc)
 }
 
 static sem_t mutex;
+static volatile int loop = 1;
 static void* writer(void* __unused arg) {
     int fd = open(MODULE_PATH, O_RDWR);
     ATF_REQUIRE(fd >= 0);
@@ -78,9 +80,9 @@ static void* writer(void* __unused arg) {
 
     ATF_REQUIRE_EQ(0, sem_post(&mutex)); 
 
-    while (1) {
-        ATF_REQUIRE(write(fd, "A", 1) != -1);
-        ATF_REQUIRE(read(fd, &buff, 1) != -1); 
+    while (loop) {
+        (void)write(fd, "A", 1);
+        (void)read(fd, &buff, 1); 
     }
     close(fd);
     return NULL;
@@ -91,6 +93,8 @@ static void* unloader(void* __unused arg) {
     sleep(1); // time for the while loop to start
 
     ATF_REQUIRE_ERRNO(EBUSY, kldunload(kldfind(DRIVER_NAME)) == -1);
+
+    atomic_subtract_int(&loop, 1); // make writer loop stop
 
     return NULL;  
 }
@@ -106,15 +110,13 @@ ATF_TC_BODY(driver_hot_unload, tc)
     pthread_t t1, t2;
     
     ATF_REQUIRE_EQ(0, pthread_create(&t1, NULL, writer, NULL));
-    sleep(1);
     ATF_REQUIRE_EQ(0, pthread_create(&t2, NULL, unloader, NULL));
     
-    ATF_REQUIRE_EQ(0, pthread_cancel(t1));
     ATF_REQUIRE_EQ(0, pthread_join(t1, NULL));
     ATF_REQUIRE_EQ(0, pthread_join(t2, NULL));
 
     ATF_REQUIRE_EQ(0, sem_destroy(&mutex));
-
+    
     ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
 }
 ATF_TC_CLEANUP(driver_hot_unload, tc)
