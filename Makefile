@@ -1,6 +1,8 @@
 TESTSDIR=	${TESTSBASE}/rustdrv 
 
-DRIVER_PATH ?= /home/ace/freebsd-kernel-module-rust/hello.ko
+# Edit this path to select the driver
+DRIVER_PATH ?= PATH/TO/YOUR/DRIVER/freebsd-kernel-module-rust/hello.ko
+
 MODULE_PATH ?= /dev/rustmodule
 DRIVER_NAME ?= hello.ko
 

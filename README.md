@@ -7,19 +7,20 @@ The driver that is being tested is: https://github.com/Acesp25/freebsd-kernel-mo
 ## Setup
 To setup and run the tests,
 1. Clone rustdrv under ```src/tests/rustdrv```
-2. Clone the previously mentioned driver under $HOME and follow the repo's instructions to build it.
+2. Clone the previously mentioned driver and follow the repo's instructions to build it.
 3. cd to the installed rustdrv folder
-4. Use the provided Makefile to build and install the tests:
+4. Edit the DRIVER_PATH variable to point towards your driver in the Makefile
+5. Use the provided Makefile to build and install the tests:
 ``` sh
 make
 sudo make install # installs the tests and creates a Kyuafile into /usr/tests/rustdrv
 ```
-5. Run the tests:
+6. Run the tests:
  ```sh
 sudo kyua test -k /usr/tests/rustdrv/Kyuafile
 ```
 
-## Tests
+## Tests Included
 ### Core Tests: core_test.c
 1. Load/Unload test
 2. Open/Close test
@@ -36,6 +37,3 @@ sudo kyua test -k /usr/tests/rustdrv/Kyuafile
 1. Stress load test
 2. Concurrency test
 3. Leakage test
-
-## Comments
-If the pathing doesnt seem to work, try editing the variables in the Makefile
