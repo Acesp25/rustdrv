@@ -30,9 +30,9 @@ ATF_TC_BODY(driver_stress_load, tc)
     int kld_id;
     for (int i = 0; i < 1000; ++i) {
         kld_id = kldload(DRIVER_PATH);
-        ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+        ATF_REQUIRE(kld_id >= 0);
 
-        ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+        ATF_REQUIRE_EQ(0, kldunload(kld_id));
     }
 }
 ATF_TC_CLEANUP(driver_stress_load, tc)
@@ -58,7 +58,7 @@ ATF_TC_WITH_CLEANUP(driver_concurrency);
 ATF_TC_HEAD(driver_concurrency, tc) {}
 ATF_TC_BODY(driver_concurrency, tc) {
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
 
     pthread_t t1, t2;
     
@@ -79,7 +79,7 @@ static void read_vmtotal(struct vmtotal *vt)
 {
     int mib[2] = {CTL_VM, VM_TOTAL};
     size_t len = sizeof(*vt);
-    ATF_REQUIRE_MSG(sysctl(mib, 2, vt, &len, NULL, 0) == 0, "sysctl failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, sysctl(mib, 2, vt, &len, NULL, 0));
     ATF_REQUIRE_MSG(len == sizeof(*vt), "sysctl returned unexpected size");
 }
 ATF_TC_WITH_CLEANUP(driver_leakage);
@@ -90,9 +90,10 @@ ATF_TC_BODY(driver_leakage, tc)
     read_vmtotal(&before);
 
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
+
     int fd = open(MODULE_PATH, O_RDWR);
-    ATF_REQUIRE_MSG(fd >= 0, "Unable to open from MODULE_PATH: %s", strerror(errno));
+    ATF_REQUIRE(fd >= 0);
 
     char buff[21] = {0};
     for (int i = 0; i < 1000; i++) {
@@ -103,14 +104,12 @@ ATF_TC_BODY(driver_leakage, tc)
     }
 
     close(fd);
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 
     read_vmtotal(&after);
 
-    ATF_CHECK_MSG(after.t_free >= before.t_free - 10, "free pages dropped from %jd to %jd", 
-            (intmax_t)before.t_free, (intmax_t)after.t_free);
-    ATF_CHECK_MSG(after.t_vm <= before.t_vm + 10, "total VM pages grew from %jd to %jd",
-            (intmax_t)before.t_vm, (intmax_t)after.t_vm);
+    ATF_CHECK(after.t_free >= before.t_free - 10);
+    ATF_CHECK(after.t_vm <= before.t_vm + 10);
 }
 ATF_TC_CLEANUP(driver_leakage, tc)
 {

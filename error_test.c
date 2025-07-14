@@ -26,10 +26,10 @@ ATF_TC_HEAD(driver_null_input, tc) {}
 ATF_TC_BODY(driver_null_input, tc)
 {
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
 
     int fd = open(MODULE_PATH, O_RDWR);
-    ATF_REQUIRE_MSG(fd >= 0, "Unable to open MODULE_PATH: %s", strerror(errno));
+    ATF_REQUIRE(fd >= 0);
 
     ssize_t rd = read(fd, NULL, 10);
     ATF_REQUIRE_ERRNO(EFAULT, (rd < 0));
@@ -39,7 +39,7 @@ ATF_TC_BODY(driver_null_input, tc)
 
     close(fd);
 
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 }
 ATF_TC_CLEANUP(driver_null_input, tc)
 {
@@ -52,15 +52,15 @@ ATF_TC_HEAD(driver_open_unload, tc) {}
 ATF_TC_BODY(driver_open_unload, tc)
 {
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
 
     int fd = open(MODULE_PATH, O_RDWR);
-    ATF_REQUIRE_MSG(fd >= 0, "Unable to open MODULE_PATH: %s", strerror(errno));
+    ATF_REQUIRE(fd >= 0);
 
     ATF_REQUIRE_ERRNO(EBUSY, kldunload(kld_id) == -1);
 
     close(fd);
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 }
 ATF_TC_CLEANUP(driver_open_unload, tc)
 {
@@ -103,7 +103,7 @@ ATF_TC_HEAD(driver_hot_unload, tc) {}
 ATF_TC_BODY(driver_hot_unload, tc)
 {
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
 
     ATF_REQUIRE_EQ(0, sem_init(&mutex, 0, 0));
 
@@ -117,7 +117,7 @@ ATF_TC_BODY(driver_hot_unload, tc)
 
     ATF_REQUIRE_EQ(0, sem_destroy(&mutex));
     
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 }
 ATF_TC_CLEANUP(driver_hot_unload, tc)
 {
@@ -130,9 +130,9 @@ ATF_TC_HEAD(driver_permission, tc) {}
 ATF_TC_BODY(driver_permission, tc)
 {
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
 
-    ATF_REQUIRE_MSG(chmod(MODULE_PATH, S_IRUSR|S_IWUSR) == 0, "chmod(1) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, chmod(MODULE_PATH, S_IRUSR|S_IWUSR));
 
     // 65534 is UID of nobody
     ATF_REQUIRE_EQ(0, seteuid(65534));
@@ -141,7 +141,7 @@ ATF_TC_BODY(driver_permission, tc)
 
     ATF_REQUIRE_EQ(0, seteuid(0));
 
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 }
 ATF_TC_CLEANUP(driver_permission, tc)
 {

@@ -23,11 +23,11 @@ ATF_TC_HEAD(driver_load_unload, tc) {}
 ATF_TC_BODY(driver_load_unload, tc)
 {
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
 
     ATF_REQUIRE_MSG(kldfind(DRIVER_NAME) >= 0, "kld not found after loading: %s", strerror(errno));
 
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 }
 ATF_TC_CLEANUP(driver_load_unload, tc)
 {
@@ -40,13 +40,13 @@ ATF_TC_HEAD(driver_open_close, tc) {}
 ATF_TC_BODY(driver_open_close, tc)
 {
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
 
     int fd = open(MODULE_PATH, O_RDWR);
-    ATF_REQUIRE_MSG(fd >= 0, "Unable to open /dev/rustmodule: %s", strerror(errno));
+    ATF_REQUIRE(fd >= 0);
 
     close(fd);
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 }
 ATF_TC_CLEANUP(driver_open_close, tc)
 {
@@ -59,17 +59,17 @@ ATF_TC_HEAD(driver_read_write, tc) {}
 ATF_TC_BODY(driver_read_write, tc)
 {
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
 
     int fd = open(MODULE_PATH, O_RDWR);
-    ATF_REQUIRE_MSG(fd >= 0, "Unable to open /dev/rustmodule: %s", strerror(errno));
+    ATF_REQUIRE(fd >= 0);
 
     ATF_REQUIRE(write(fd, "Hello :D", 8) != -1);
     char buff[8] = {0};
     ATF_REQUIRE(read(fd, &buff, 8) != -1);
 
     close(fd);
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 }
 ATF_TC_CLEANUP(driver_read_write, tc) 
 {
@@ -89,10 +89,10 @@ ATF_TC_BODY(driver_jail, tc)
     char jailname[] = "echojail";
 
     int kld_id = kldload(DRIVER_PATH);
-    ATF_REQUIRE_MSG(kld_id >= 0, "kldload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE(kld_id >= 0);
 
     pid_t child = fork();
-    ATF_REQUIRE_MSG(child >= 0, "fork failed: %s", strerror(errno));
+    ATF_REQUIRE(child >= 0);
 
     if (child == 0) { 
         memset(&j, 0, sizeof(j));
@@ -102,7 +102,7 @@ ATF_TC_BODY(driver_jail, tc)
         j.jailname = jailname;
 
         jail_id = jail(&j);
-        ATF_REQUIRE_MSG(jail_id >= 0, "jail() failed: %s", strerror(errno));
+        if (jail_id < 0) _exit(1);
 
         int fd = open(MODULE_PATH, O_RDWR);
         if (fd < 0) _exit(1);
@@ -116,11 +116,11 @@ ATF_TC_BODY(driver_jail, tc)
     }
 
     int status;
-    ATF_REQUIRE_MSG(waitpid(child, &status, 0) == child, "waitpid failed: %s", strerror(errno));
+    ATF_REQUIRE(waitpid(child, &status, 0) == child);
     ATF_REQUIRE_MSG(WIFEXITED(status) && WEXITSTATUS(status) == 0, 
             "child failed with status %d", WEXITSTATUS(status));
 
-    ATF_REQUIRE_MSG(kldunload(kld_id) == 0, "kldunload(2) failed: %s", strerror(errno));
+    ATF_REQUIRE_EQ(0, kldunload(kld_id));
 }
 ATF_TC_CLEANUP(driver_jail, tc)
 {
